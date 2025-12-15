@@ -377,7 +377,7 @@
         async function subirFotoAlServidor(file) {
             const formData = new FormData();
             formData.append("file", file);
-            const res = await fetch("http://localhost:8080/upload", { method: "POST", body: formData });
+            const res = await fetch("https://servicios-api-4zmt.onrender.com/upload", { method: "POST", body: formData });
             if (!res.ok) throw new Error("Error subiendo imagen");
             const data = await res.json();
             return data.url;

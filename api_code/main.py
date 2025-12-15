@@ -27,7 +27,7 @@ db_connections = {}
 mp_token = os.environ.get("MP_ACCESS_TOKEN")
 
 # URL del frontend (usada en las back_urls de Mercado Pago)
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:8080")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "https://servicios-api-4zmt.onrender.com")
 
 # Verificación de Seguridad
 if not mp_token:
@@ -241,7 +241,7 @@ async def subir_imagen(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
             
         # 4. Devolver URL válida
-        url_publica = f"http://localhost:8080/uploads/{nombre_archivo}"
+        url_publica = f"https://servicios-api-4zmt.onrender.com/uploads/{nombre_archivo}"
         return {"url": url_publica}
         
     except Exception as e:
