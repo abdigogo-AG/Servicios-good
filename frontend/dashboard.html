@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Panel - Servicios del Hogar</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="principal.css">
+    <style>
+        body { background-color: #f4f6f8; align-items: flex-start; }
+        
+        header {
+            background: white; padding: 15px 5%; display: flex; justify-content: space-between; 
+            align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); width: 100%; position: sticky; top: 0; z-index: 100;
+        }
+        
+        .container-dashboard { max-width: 1000px; margin: 40px auto; padding: 0 20px; width: 100%; }
+
+        .dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+        .btn-accion { background-color: #0b69ff; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; display: inline-flex; gap: 8px; border: none; cursor: pointer; }
+        .btn-accion:hover { background-color: #0056d6; transform: translateY(-2px); }
+        .btn-logout { border: 1px solid #dc3545; color: #dc3545; background: white; padding: 5px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+
+        /* GRID SERVICIOS */
+        .grid-servicios { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .servicio-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid #ccc; transition: 0.2s; }
+        .servicio-card:hover { transform: translateY(-3px); }
+
+        /* ESTADOS */
+        .borde-SOLICITADO { border-left-color: #ffc107; }
+        .borde-ACEPTADO, .borde-EN_PROCESO { border-left-color: #28a745; }
+        .borde-TERMINADO { border-left-color: #17a2b8; }
+
+        /* DETALLES TRABAJADOR (MODAL) */
+        .worker-profile-card { display: flex; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
+        .worker-avatar { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; border: 2px solid #eee; }
+        .worker-details h4 { margin: 0 0 5px; font-size: 16px; }
+        .worker-bio { font-size: 12px; color: #666; margin: 5px 0; font-style: italic; }
+        .worker-stats { display: flex; gap: 10px; font-size: 12px; }
+        .rating-stars { color: #ffc107; }
+
+        /* Botón WhatsApp (Solo visible tras pago) */
+        .btn-whatsapp { background: #25D366; color: white; padding: 8px 15px; border-radius: 20px; text-decoration: none; font-weight: bold; display: inline-flex; align-items: center; gap: 5px; font-size: 14px; margin-top: 10px; }
+        .btn-whatsapp:hover { background: #1ebc57; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo" style="font-weight: bold; color: #0b69ff; font-size: 22px; cursor:pointer;" onclick="window.location.href='principal.html'">
+            <i class="fas fa-home"></i> ServiciosApp
+        </div>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="user-name" style="color: #555; font-weight: 500;">...</span>
+            <button id="btn-mi-perfil" class="btn-accion" style="background: #6c757d; padding: 5px 15px; font-size: 14px;">
+                <i class="fas fa-user"></i> Perfil
+            </button>
+            <button onclick="cerrarSesion()" class="btn-logout"><i class="fas fa-sign-out-alt"></i></button>
+        </div>
+    </header>
+
+    <div class="container-dashboard">
+        <div class="dashboard-header">
+            <h1 id="titulo-dashboard">Mis Actividades</h1>
+            <a id="btn-principal-accion" href="#" class="btn-accion"><i class="fas fa-plus"></i> Acción</a>
+        </div>
+
+        <div id="lista-servicios" class="grid-servicios">
+            <p>Cargando información...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8080";
+        const usuarioId = localStorage.getItem("usuario_id");
+        const usuarioNombre = localStorage.getItem("usuario_nombre");
+        const esTrabajador = localStorage.getItem("es_trabajador") === "true"; 
+
+        if (!usuarioId) window.location.href = "login.html";
+
+        document.getElementById('user-name').innerText = "Hola, " + (usuarioNombre ? usuarioNombre.split(" ")[0] : "Usuario");
+        
+        const btnPerfil = document.getElementById('btn-mi-perfil');
+        btnPerfil.onclick = () => {
+            window.location.href = esTrabajador ? "perfil_trabajador.html" : "perfil_cliente.html";
+        };
+
+        const titulo = document.getElementById('titulo-dashboard');
+        const btnAccion = document.getElementById('btn-principal-accion');
+        const contenedor = document.getElementById('lista-servicios');
+
+        async function cargarDashboard() {
+            // 1. VERIFICAR SI VENIMOS DE UN PAGO DE MERCADO PAGO
+            const urlParams = new URLSearchParams(window.location.search);
+            const statusPago = urlParams.get('status'); // 'approved', 'failure'
+            
+            if (statusPago === 'approved') {
+                // En producción, esto se valida con el Backend, pero visualmente:
+                Swal.fire("¡Pago Recibido!", "Has contratado al trabajador. Ahora puedes ver su contacto.", "success");
+                // Limpiamos la URL para que no salga la alerta al recargar
+                window.history.replaceState({}, document.title, "dashboard.html");
+            }
+
+            let url = "";
+            if (esTrabajador) {
+                titulo.innerText = "Mis Trabajos Activos";
+                btnAccion.innerHTML = `<i class="fas fa-search"></i> Buscar Nuevos Trabajos`;
+                btnAccion.href = "ver_trabajos.html"; 
+                btnAccion.style.background = "#28a745";
+                url = `${API_URL}/trabajador/mis-trabajos/${usuarioId}`;
+            } else {
+                titulo.innerText = "Mis Solicitudes";
+                btnAccion.innerHTML = `<i class="fas fa-paper-plane"></i> Pedir Nuevo Servicio`;
+                btnAccion.href = "solicitar.html";
+                url = `${API_URL}/servicios/${usuarioId}`;
+            }
+
+            try {
+                const res = await fetch(url);
+                const datos = await res.json();
+                contenedor.innerHTML = ""; 
+
+                if (datos.length === 0) {
+                    contenedor.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px; background:white; border-radius:10px;">
+                        <i class="fas fa-inbox" style="font-size:40px; color:#ccc;"></i><p>No hay actividad aún.</p>
+                    </div>`;
+                    return;
+                }
+
+                datos.forEach(s => {
+                    const fecha = new Date(s.fecha_programada || s.fecha_solicitud).toLocaleDateString();
+                    const precio = s.precio_estimado > 0 ? `$${s.precio_estimado}` : "A convenir";
+                    
+                    // --- LÓGICA DE CONTACTO (Solo si ya se pagó/aceptó) ---
+                    let contactoHTML = "";
+                    // Si el trabajo YA fue aceptado, mostramos el teléfono
+                    if ((s.estado === 'ACEPTADO' || s.estado === 'EN_PROCESO')) {
+                        const telefono = esTrabajador ? s.cliente_telefono : "Ver en Perfil"; // Simplificación
+                        if(telefono) {
+                             // En la vida real aquí iría el número del trabajador si eres cliente
+                             contactoHTML = `<a href="#" onclick="alert('Teléfono desbloqueado: Contacta para coordinar.')" class="btn-whatsapp"><i class="fab fa-whatsapp"></i> Contactar por WhatsApp</a>`;
+                        }
+                    }
+
+                    // --- BOTONES DE ACCIÓN ---
+                    let accionesHTML = "";
+                    if (!esTrabajador) { 
+                        // VISTA CLIENTE
+                        if (s.estado === 'SOLICITADO') {
+                            const num = s.num_propuestas || 0;
+                            accionesHTML = num > 0 
+                                ? `<button onclick="verPropuestas('${s.id}')" class="btn-accion" style="background:#6f42c1; font-size:12px; width:100%; justify-content:center;">Ver ${num} Propuestas</button>`
+                                : `<small style="color:#777">Esperando postulaciones...</small>`;
+                        } else if (s.estado === 'ACEPTADO' || s.estado === 'EN_PROCESO') {
+                            accionesHTML = `<button onclick="finalizarServicio('${s.id}')" class="btn-accion" style="background:#17a2b8; font-size:12px; width:100%; justify-content:center;">✅ Finalizar y Calificar</button>`;
+                        }
+                    } else {
+                        // VISTA TRABAJADOR
+                        accionesHTML = `<small style="color:#555">Estado: ${s.estado}</small>`;
+                    }
+
+                    const html = `
+                        <div class="servicio-card borde-${s.estado}">
+                            <div class="card-header">
+                                <span class="card-tag">${s.categoria || 'Servicio'}</span>
+                                <span class="precio">${precio}</span>
+                            </div>
+                            <h3 class="card-title">${s.titulo}</h3>
+                            <p class="card-desc">${s.descripcion}</p>
+                            
+                            <div style="margin:10px 0; font-size:13px; color:#888; border-top:1px solid #eee; padding-top:10px;">
+                                <i class="far fa-calendar-alt"></i> ${fecha} <br>
+                                <i class="fas fa-map-marker-alt"></i> ${s.direccion_texto || 'Ubicación mapa'}
+                            </div>
+
+                            ${contactoHTML}
+                            <div style="margin-top:10px;">${accionesHTML}</div>
+                        </div>
+                    `;
+                    contenedor.innerHTML += html;
+                });
+            } catch (error) { console.error(error); }
+        }
+
+        // --- VER PROPUESTAS (SIN TELÉFONO) ---
+        async function verPropuestas(id) {
+            try {
+                const res = await fetch(`${API_URL}/servicios/${id}/propuestas`);
+                const props = await res.json();
+
+                if(props.length === 0) return Swal.fire("Aún no hay propuestas");
+
+                let htmlLista = "";
+                props.forEach(p => {
+                    const rating = p.calificacion_promedio ? `⭐ ${p.calificacion_promedio}` : '✨ Nuevo';
+                    const exp = p.anios_experiencia ? `(${p.anios_experiencia} años exp)` : "";
+                    
+                    htmlLista += `
+                        <div class="worker-profile-card">
+                            <img src="${p.foto_perfil_url || 'https://via.placeholder.com/60'}" class="worker-avatar" onerror="this.src='https://via.placeholder.com/60'">
+                            <div class="worker-details" style="text-align:left; flex:1;">
+                                <h4>${p.nombre} ${p.apellidos || ''}</h4>
+                                <div class="worker-stats" style="color:#f39c12;">${rating} <span style="color:#777;">${exp}</span></div>
+                                <p class="worker-bio">"${p.mensaje}"</p>
+                                <div style="font-weight:bold; color:#28a745; margin-top:5px;">Oferta: $${p.precio_oferta}</div>
+                                <!-- AQUÍ OCULTAMOS EL TELÉFONO DEL TRABAJADOR -->
+                                <small style="color:#999; font-size:10px;">* Contacto disponible tras contratar</small>
+                            </div>
+                            <button class="btn-accion" style="height:fit-content; font-size:12px; background:#009ee3;" onclick="iniciarPagoReal('${id}', '${p.trabajador_id}', '${p.id}', ${p.precio_oferta})">
+                                Pagar y Contratar
+                            </button>
+                        </div>
+                    `;
+                });
+
+                Swal.fire({
+                    title: 'Propuestas Recibidas',
+                    html: `<div style="max-height:400px; overflow-y:auto; text-align:left;">${htmlLista}</div>`,
+                    width: 600,
+                    showConfirmButton: false, showCloseButton: true
+                });
+
+            } catch(e) { console.error(e); Swal.fire("Error", "No se cargaron las propuestas", "error"); }
+        }
+
+        // --- PAGO REAL CON MERCADO PAGO ---
+        async function iniciarPagoReal(servicioId, trabajadorId, propuestaId, monto) {
+            Swal.close(); // Cerrar lista
+
+            Swal.fire({
+                title: 'Generando pago...',
+                text: 'Te estamos redirigiendo a Mercado Pago para asegurar tu dinero.',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading(); }
+            });
+
+            try {
+                // 1. Llamamos al endpoint correcto del backend
+                const res = await fetch(`${API_URL}/pagos/crear-preferencia`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        servicio_id: servicioId,
+                        titulo: "Contratación de Servicio",
+                        precio: parseFloat(monto),
+                        trabajador_id: trabajadorId,
+                        propuesta_id: propuestaId
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.init_point) {
+                    // 2. ¡REDIRECCIÓN REAL! Nos vamos a la página de Mercado Pago
+                    window.location.href = data.init_point;
+                } else {
+                    Swal.fire("Error", "No se pudo generar el link de pago", "error");
+                }
+
+            } catch (e) {
+                console.error(e);
+                Swal.fire("Error", "Fallo de conexión con el servidor", "error");
+            }
+        }
+
+        async function finalizarServicio(id) {
+            const { value: formValues } = await Swal.fire({
+                title: 'Calificar Servicio',
+                html: '<input id="swal-input1" class="swal2-input" type="number" min="1" max="5" placeholder="Estrellas (1-5)"><textarea id="swal-input2" class="swal2-textarea" placeholder="Reseña..."></textarea>',
+                focusConfirm: false,
+                preConfirm: () => { return { calificacion: document.getElementById('swal-input1').value, resena: document.getElementById('swal-input2').value } }
+            });
+            if (formValues) {
+                try {
+                    const res = await fetch(`${API_URL}/servicios/finalizar`, {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ servicio_id: id, calificacion: parseInt(formValues.calificacion), resena: formValues.resena })
+                    });
+                    if(res.ok) { Swal.fire("¡Gracias!", "Servicio finalizado.", "success"); cargarDashboard(); }
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        function cerrarSesion() {
+            if(confirm("¿Cerrar sesión?")) { localStorage.clear(); window.location.href = "login.html"; }
+        }
+
+        cargarDashboard();
+    </script>
+</body>
+</html>

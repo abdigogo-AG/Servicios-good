@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Solicitudes</title>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="principal.css">
+    <style>
+        body { background-color: #f4f6f8; }
+        .container { max-width: 900px; margin: 40px auto; padding: 0 20px; }
+        
+        .card-solicitud {
+            background: white; border-radius: 12px; padding: 25px; margin-bottom: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; border-left: 5px solid #0b69ff;
+        }
+        .status-badge {
+            position: absolute; top: 20px; right: 20px;
+            padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold;
+        }
+        .status-SOLICITADO { background: #fff3cd; color: #856404; }
+        .status-ACEPTADO { background: #d4edda; color: #155724; }
+
+        /* --- NUEVOS ESTILOS PARA CANDIDATOS --- */
+        .candidatos-box {
+            margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: none;
+            background-color: #fafafa; border-radius: 0 0 10px 10px; padding: 20px;
+        }
+        
+        .candidato-card {
+            background: white; border-radius: 10px; padding: 15px; margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex; gap: 15px; flex-wrap: wrap; align-items: flex-start;
+        }
+
+        /* Foto de perfil redonda */
+        .foto-perfil {
+            width: 70px; height: 70px; border-radius: 50%; object-fit: cover;
+            border: 2px solid #0b69ff;
+        }
+
+        .info-profesional { flex: 1; min-width: 200px; }
+        .info-profesional h4 { margin: 0 0 5px; color: #333; font-size: 18px; }
+        .dato-extra { font-size: 13px; color: #666; margin-bottom: 3px; }
+        .dato-extra i { color: #0b69ff; width: 20px; text-align: center; }
+        
+        .mensaje-propuesta {
+            background: #f0f7ff; padding: 10px; border-radius: 8px; 
+            font-size: 14px; color: #444; margin-top: 10px; font-style: italic;
+        }
+
+        .acciones-candidato {
+            display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+            min-width: 150px;
+        }
+        
+        .precio-grande { font-size: 24px; font-weight: 800; color: #28a745; }
+        
+        .btn-whatsapp {
+            background-color: #25D366; color: white; border: none; padding: 8px 15px; 
+            border-radius: 5px; font-weight: bold; cursor: pointer; text-decoration: none;
+            display: inline-flex; align-items: center; gap: 5px; font-size: 14px;
+        }
+        .btn-whatsapp:hover { background-color: #1ebe57; }
+
+        .btn-contratar {
+            background: #0b69ff; color: white; border: none; padding: 10px 20px; 
+            border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%;
+        }
+        .btn-contratar:hover { background: #0056b3; }
+
+    </style>
+</head>
+<body>
+
+    <div style="background: white; padding: 15px 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <div style="font-weight: bold; color: #0b69ff; cursor:pointer;" onclick="window.location.href='index.html'">
+            <i class="fas fa-arrow-left"></i> Volver al Inicio
+        </div>
+        <h2>Mis Solicitudes</h2>
+        <div style="width: 80px;"></div> </div>
+
+    <div class="container" id="lista-mis-servicios">
+        <div style="text-align: center; margin-top: 50px;">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p>Cargando tus solicitudes...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8080";
+        const usuarioId = localStorage.getItem("usuario_id");
+
+        if(!usuarioId) window.location.href = "login.html";
+
+        document.addEventListener("DOMContentLoaded", cargarMisServicios);
+
+        async function cargarMisServicios() {
+            try {
+                const res = await fetch(`${API_URL}/servicios/${usuarioId}`);
+                const servicios = await res.json();
+                const contenedor = document.getElementById("lista-mis-servicios");
+                contenedor.innerHTML = "";
+
+                if(servicios.length === 0) {
+                    contenedor.innerHTML = "<p>Sin historial.</p>"; return;
+                }
+
+                servicios.forEach(s => {
+                    let accionesHtml = "";
+                    let estadoColor = "";
+
+                    // LÓGICA DE ESTADOS
+                    if(s.estado === 'SOLICITADO') {
+                        estadoColor = "#fff3cd"; // Amarillo
+                        accionesHtml = `<button onclick="verCandidatos('${s.id}')" style="color:#0b69ff; cursor:pointer; background:none; border:none; text-decoration:underline;">Ver Candidatos</button>`;
+                    
+                    } else if (s.estado === 'EN_PROCESO') {
+                        estadoColor = "#d1ecf1"; // Azulito
+                        accionesHtml = `
+                            <div style="margin-top:10px; padding:10px; background:#eef9fd; border-left:4px solid #17a2b8;">
+                                <p style="margin:0; font-weight:bold; color:#138496;">🚧 Trabajo en Curso</p>
+                                <p style="font-size:13px;">Cuando el trabajador termine, haz clic abajo.</p>
+                                <button class="btn-contratar" style="background:#28a745; margin-top:5px;" onclick="pagarYCalificar('${s.id}')">
+                                    <i class="fas fa-star"></i> Pagar y Calificar
+                                </button>
+                            </div>`;
+                    
+                    } else if (s.estado === 'TERMINADO') {
+                        estadoColor = "#d4edda"; // Verde
+                        accionesHtml = `
+                            <div style="margin-top:10px; color:#155724;">
+                                <strong>✅ Finalizado</strong> <br>
+                                <small>Calificaste con ${s.calificacion || 5} estrellas.</small>
+                            </div>`;
+                    }
+
+                    const html = `
+                        <div class="card-solicitud">
+                            <span class="status-badge" style="background:${estadoColor}">${s.estado}</span>
+                            <h3>${s.titulo}</h3>
+                            <p style="color:#666; font-size:13px;">${s.fecha_solicitud.split('T')[0]}</p>
+                            <p>${s.descripcion}</p>
+                            ${accionesHtml}
+                            <div id="candidatos-${s.id}" class="candidatos-box"></div>
+                        </div>
+                    `;
+                    contenedor.innerHTML += html;
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function pagarYCalificar(servicioId) {
+            // Usamos SweetAlert para el formulario de estrellas
+            const { value: formValues } = await Swal.fire({
+                title: 'Califica el servicio',
+                html: `
+                    <p>Selecciona una puntuación:</p>
+                    <select id="swal-stars" class="swal2-input">
+                        <option value="5">⭐⭐⭐⭐⭐ Excelente</option>
+                        <option value="4">⭐⭐⭐⭐ Muy bueno</option>
+                        <option value="3">⭐⭐⭐ Regular</option>
+                        <option value="2">⭐⭐ Malo</option>
+                        <option value="1">⭐ Pésimo</option>
+                    </select>
+                    <textarea id="swal-review" class="swal2-textarea" placeholder="Escribe una reseña..."></textarea>
+                `,
+                focusConfirm: false,
+                confirmButtonText: 'Pagar y Finalizar',
+                preConfirm: () => {
+                    return {
+                        stars: document.getElementById('swal-stars').value,
+                        review: document.getElementById('swal-review').value
+                    }
+                }
+            });
+
+            if (formValues) {
+                try {
+                    const res = await fetch(`${API_URL}/servicios/finalizar`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            servicio_id: servicioId,
+                            calificacion: parseInt(formValues.stars),
+                            resena: formValues.review
+                        })
+                    });
+                    if(res.ok) {
+                        Swal.fire('¡Gracias!', 'Pago realizado y calificación guardada.', 'success').then(() => window.location.reload());
+                    }
+                } catch(e) { Swal.fire('Error', 'Algo falló', 'error'); }
+            }
+        }
+
+        async function verCandidatos(servicioId) {
+            const box = document.getElementById(`candidatos-${servicioId}`);
+            if(box.style.display === "block") {
+                box.style.display = "none";
+                return;
+            }
+            box.style.display = "block";
+            box.innerHTML = '<p style="text-align:center"><i class="fas fa-spinner fa-spin"></i> Cargando candidatos...</p>';
+
+            try {
+                const res = await fetch(`${API_URL}/servicios/${servicioId}/propuestas`);
+                const propuestas = await res.json();
+                
+                box.innerHTML = "";
+
+                if(propuestas.length === 0) {
+                    box.innerHTML = "<p style='text-align:center; color:#666;'>Aún no hay propuestas. Los trabajadores cercanos están siendo notificados.</p>";
+                    return;
+                }
+
+                propuestas.forEach(p => {
+                    // Imagen por defecto si no tiene una
+                    const fotoUrl = p.foto_perfil_url ? p.foto_perfil_url : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
+                    const experiencia = p.anios_experiencia ? `${p.anios_experiencia} Años de Exp.` : 'Experiencia no especificada';
+                    
+                    // Link de WhatsApp (Limpia el número de caracteres no numéricos)
+                    const telefonoLimpio = p.telefono.replace(/\D/g,'');
+                    const linkWhatsApp = `https://wa.me/52${telefonoLimpio}?text=Hola, vi tu propuesta en Homely para mi problema: ${servicioId}`;
+
+                    box.innerHTML += `
+                        <div class="candidato-card">
+                            <img src="${fotoUrl}" alt="Foto" class="foto-perfil">
+                            
+                            <div class="info-profesional">
+                                <h4>${p.nombre} ${p.apellidos}</h4>
+                                <div class="dato-extra"><i class="fas fa-star"></i> Calificación: <strong>${p.calificacion_promedio || 'Nueva Cuenta'}</strong></div>
+                                <div class="dato-extra"><i class="fas fa-briefcase"></i> ${experiencia}</div>
+                                <div class="dato-extra"><i class="fas fa-info-circle"></i> ${p.descripcion_bio || 'Sin descripción'}</div>
+                                
+                                <div class="mensaje-propuesta">
+                                    "${p.mensaje}"
+                                </div>
+                            </div>
+
+                            <div class="acciones-candidato">
+                                <div class="precio-grande">$${p.precio_oferta}</div>
+                                
+                                <a href="${linkWhatsApp}" target="_blank" class="btn-whatsapp">
+                                    <i class="fab fa-whatsapp"></i> Contactar
+                                </a>
+
+                                <button class="btn-contratar" onclick="contratar('${servicioId}', '${p.trabajador_id}', '${p.id}', '${p.nombre}')">
+                                    Contratar
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+            } catch (e) {
+                console.error(e);
+                box.innerHTML = "Error al cargar candidatos.";
+            }
+        }
+
+        async function contratar(servicioId, trabajadorId, propuestaId, nombreTrabajador) {
+            Swal.fire({
+                title: `¿Contratar a ${nombreTrabajador}?`,
+                text: "El estado del servicio cambiará a ACEPTADO y se le notificará al profesional.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Sí, ¡Contratar!'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const res = await fetch(`${API_URL}/servicios/contratar`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                servicio_id: servicioId,
+                                trabajador_id: trabajadorId,
+                                propuesta_id: propuestaId
+                            })
+                        });
+
+                        if(res.ok) {
+                            Swal.fire('¡Contratado!', 'El servicio ha comenzado.', 'success').then(() => {
+                                window.location.reload();
+                            });
+                        } else {
+                            Swal.fire('Error', 'No se pudo completar la contratación.', 'error');
+                        }
+                    } catch (e) { console.error(e); }
+                }
+            });
+        }
+    </script>
+
+</body>
+</html>

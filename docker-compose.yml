@@ -1,0 +1,58 @@
+# version: '3.8'
+
+services:
+
+  db_postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: "un_password_de_app_seguro"
+      POSTGRES_DB: registros
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+    - ./postgres_scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+    - "5432:5432"
+    networks:
+    - services_net
+
+
+
+# --- Servicio 3: API de Python (NUEVO) ---
+  api:
+    build:
+      context: . # Busca el Dockerfile en la carpeta actual ('.')
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      # Expone el puerto 8080 de su API a su máquina
+      - "8080:8080"
+    environment:
+      # Pasa las URLs de conexión a la API
+      POSTGRES_URL: "postgresql://app_user:un_password_de_app_seguro@db_postgres:5432/registros"
+      MP_ACCESS_TOKEN: "APP_USR-5568639099903841-120208-8abf0462fa02216d9dc8675848e6d77c-3033160403"
+    volumes:
+      # --- ¡ESTA ES LA LÍNEA NUEVA! ---
+      # Mapea la carpeta 'uploads' de tu PC a la carpeta '/app/uploads' del contenedor
+      - ./uploads:/app/uploads
+
+       # --- ESTA ES LA SOLUCIÓN ---
+    # Sobrescribimos el comando para decirle a uvicorn que ignore la carpeta uploads
+    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload --reload-dir /app --reload-exclude "uploads/*"
+    
+    depends_on:
+      - db_postgres # Asegura que Postgres inicie primero
+    networks:
+      - services_net # Conecta la API a la misma red
+
+
+
+
+
+volumes:
+  postgres_data:
+
+networks:
+  services_net:
+    driver: bridge

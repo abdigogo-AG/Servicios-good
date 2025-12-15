@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Trabajos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="stylesheet" href="principal.css">
+    <style>
+        body { background-color: #f4f6f8; }
+        .container { max-width: 900px; margin: 40px auto; padding: 20px; }
+        .card-trabajo-activo {
+            background: white; border-radius: 10px; padding: 20px; margin-bottom: 20px;
+            border-left: 5px solid #28a745; box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+        .card-historial {
+            background: #f9f9f9; border-radius: 10px; padding: 15px; margin-bottom: 15px; opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+    <div style="background: white; padding: 15px 5%; display: flex; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+        <div style="font-weight: bold; color: #0b69ff; cursor:pointer; margin-right:20px;" onclick="window.location.href='index.html'">
+            <i class="fas fa-arrow-left"></i> Volver
+        </div>
+        <h2>Mis Trabajos</h2>
+    </div>
+
+    <div class="container">
+        <h3 style="color:#444; border-bottom:2px solid #ddd; padding-bottom:10px;">🚧 En Curso</h3>
+        <div id="lista-activos">Cargando...</div>
+
+        <h3 style="color:#444; border-bottom:2px solid #ddd; padding-bottom:10px; margin-top:40px;">✅ Historial Finalizado</h3>
+        <div id="lista-historial">Cargando...</div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8080";
+        const usuarioId = localStorage.getItem("usuario_id");
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            const res = await fetch(`${API_URL}/trabajador/mis-trabajos/${usuarioId}`);
+            const trabajos = await res.json();
+
+            const divActivos = document.getElementById("lista-activos");
+            const divHistorial = document.getElementById("lista-historial");
+            divActivos.innerHTML = ""; divHistorial.innerHTML = "";
+
+            if(trabajos.length === 0) {
+                divActivos.innerHTML = "<p>No tienes trabajos asignados aún.</p>";
+                divHistorial.innerHTML = "";
+                return;
+            }
+
+            trabajos.forEach(t => {
+                const telefonoCliente = t.cliente_telefono.replace(/\D/g,'');
+                const waLink = `https://wa.me/52${telefonoCliente}`;
+
+                // TARJETA GENÉRICA
+                let html = `
+                    <div class="${t.estado === 'EN_PROCESO' ? 'card-trabajo-activo' : 'card-historial'}">
+                        <div style="display:flex; justify-content:space-between;">
+                            <h3>${t.titulo}</h3>
+                            <span style="font-weight:bold; color:${t.estado === 'EN_PROCESO' ? '#28a745' : '#666'}">${t.estado}</span>
+                        </div>
+                        <p><i class="fas fa-map-marker-alt"></i> ${t.direccion_texto}</p>
+                        <p><i class="fas fa-user"></i> Cliente: ${t.cliente_nombre}</p>
+                        
+                        ${t.estado === 'EN_PROCESO' ? 
+                            `<div style="margin-top:10px;">
+                                <a href="${waLink}" target="_blank" style="background:#25D366; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">
+                                    <i class="fab fa-whatsapp"></i> Chat con Cliente
+                                </a>
+                                <p style="font-size:12px; margin-top:10px; color:#666;">El cliente debe finalizar el servicio para recibir el pago.</p>
+                             </div>` 
+                            : 
+                            `<div style="margin-top:10px; font-size:14px;">
+                                <strong>Calificación:</strong> ${t.calificacion} ⭐ <br>
+                                <em>"${t.resena || 'Sin comentarios'}"</em>
+                             </div>`
+                        }
+                    </div>
+                `;
+
+                if(t.estado === 'EN_PROCESO') divActivos.innerHTML += html;
+                else divHistorial.innerHTML += html; // ACEPTADO o TERMINADO
+            });
+        });
+    </script>
+</body>
+</html>
