@@ -31,7 +31,8 @@ services:
     environment:
       # Pasa las URLs de conexión a la API
       POSTGRES_URL: "postgresql://app_user:un_password_de_app_seguro@db_postgres:5432/registros"
-      MP_ACCESS_TOKEN: "APP_USR-7386228276776845-112300-2cec97f27932c71ff8b37133d59db52e-2009513856"
+      MP_ACCESS_TOKEN: "APP_USR-5568639099903841-120208-8abf0462fa02216d9dc8675848e6d77c-3033160403"
+      FRONTEND_URL: "https://servicios-good-8hv2aqz4x-abdiabdi2004-gmailcoms-projects.vercel.app"
     volumes:
       # --- ¡ESTA ES LA LÍNEA NUEVA! ---
       # Mapea la carpeta 'uploads' de tu PC a la carpeta '/app/uploads' del contenedor
